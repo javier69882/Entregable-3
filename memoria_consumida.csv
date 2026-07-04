@@ -1,0 +1,11 @@
+estructura_de_datos;tipo_clave;memoria_usada_mb
+Hash_Abierto;user_id;8.875
+Cerrado_Lineal;user_id;4.5
+Cerrado_Cuadratico;user_id;4.5
+Cerrado_Doble;user_id;4.5
+STL_UnorderedMap;user_id;3.75
+Hash_Abierto;user_screen_name;9.625
+Cerrado_Lineal;user_screen_name;11.375
+Cerrado_Cuadratico;user_screen_name;11.375
+Cerrado_Doble;user_screen_name;11.375
+STL_UnorderedMap;user_screen_name;5.125

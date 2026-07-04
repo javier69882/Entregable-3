@@ -77,7 +77,7 @@ public:
         table.resize(size);
     }
 
-    void registrarTweet(const K& key) {
+    void processTweet(const K& key) {
         int index = hashFunction(key);
 
         for (auto& entry : table[index]) {
@@ -89,7 +89,7 @@ public:
         table[index].emplace_back(key, 1);
     }
 
-    int obtenerConteo(const K& key) const {
+    int getTweetCount(const K& key) const {
         int index = hashFunction(key);
 
         for (const auto& entry : table[index]) {
