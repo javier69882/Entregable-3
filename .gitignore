@@ -1,0 +1,5 @@
+# Entorno virtual de Python
+venv/
+
+# Archivos ejecutables compilados (opcional, pero recomendado)
+*.out
