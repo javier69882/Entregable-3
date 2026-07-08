@@ -33,8 +33,7 @@ struct CustomHash<string> {
             unsigned long long charVal = static_cast<unsigned long long>(str[i]);
             unsigned long long powerVal = 1;
 
-            // Calculamos charVal elevado a (i + 1)
-            // (Nota: Esto desbordará rápido, pero el wrap-around es válido en hashing)
+
             for (size_t j = 0; j < i + 1; ++j) {
                 powerVal *= charVal;
             }
