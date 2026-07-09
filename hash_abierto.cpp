@@ -1,16 +1,30 @@
+/**
+ * @file hash_abierto.cpp
+ * @brief Implementación de una Tabla Hash con resolución de colisiones mediante 
+ * encadenamiento (Hash Abierto).
+ */
+
 #include <iostream>
 #include <vector>
 #include <list>
 #include <string>
 
 using namespace std;
+// ============================================================================
+// Funciones hash personalizadas para tipos de clave específicos
+// ============================================================================
 
-// Funciones hash para strings y enteros (IDs de usuario)
-
+/**
+ * @brief Estructura genérica para implementar funciones hash personalizadas.
+ * @tparam K Tipo de dato de la clave.
+ */
 template <typename K>
 struct CustomHash;
-
-// Especialización para strings: ASCII^1 + ASCII^2 + ASCII^3 ...
+/**
+ * @brief Especialización de CustomHash para cadenas de texto (std::string).
+ * * Calcula el hash acumulando el valor de cada carácter elevado a la potencia
+ * de su posición (índice + 1).
+ */
 template <>
 struct CustomHash<string> {
     unsigned long long operator()(const string& str) const {
@@ -32,7 +46,11 @@ struct CustomHash<string> {
     }
 };
 
-// enteros (IDs de usuario): Método de Plegamiento (Folding)
+/**
+ * @brief Especialización de CustomHash para enteros de 64 bits (long long).
+ * * Utiliza el método de plegamiento (folding) dividiendo el valor absoluto
+ * de la clave en bloques de 16 bits y aplicando la operación XOR.
+ */
 template <>
 struct CustomHash<long long> {
     unsigned long long operator()(long long key) const {
@@ -49,34 +67,69 @@ struct CustomHash<long long> {
         return bloque1 ^ bloque2 ^ bloque3 ^ bloque4;
     }
 };
+// ============================================================================
+// Estructura de la Tabla Hash con encadenamiento (Hash Abierto)
+// ============================================================================
 
-// --- 2. ESTRUCTURAS DE LA TABLA HASH ---
-
+/**
+ * @brief Representa un elemento almacenado en la Tabla Hash.
+ * * Contiene la clave y un contador de frecuencia (útil para contar
+ * repeticiones de un mismo ID o usuario en el dataset).
+ * * @tparam K Tipo de dato de la clave.
+ */
 template <typename K>
 struct Entry {
-    K key;
-    int count;
-
+    K key;      ///< Clave única del elemento.
+    int count;  ///< Contador de ocurrencias de la clave.
+    /**
+     * @brief Constructor de la entrada.
+     * @param k Clave a almacenar.
+     * @param c Contador inicial.
+     */
     Entry(K k, int c) : key(k), count(c) {}
 };
 
+/**
+ * @brief Implementación de una Tabla Hash Abierta (Encadenamiento).
+ * * Utiliza un vector de listas doblemente enlazadas (std::list) para manejar 
+ * las colisiones. Si dos claves generan el mismo índice, ambas se añaden 
+ * a la lista correspondiente de ese índice.
+ * * @tparam K Tipo de dato de la clave.
+ */
 template <typename K>
 class HashTable {
 private:
-    vector<list<Entry<K>>> table;
-    int size;
+    vector<list<Entry<K>>> table;   ///< Contenedor principal: Array de listas.
+    int size;                       ///< Tamaño del array (cantidad de "buckets").
 
-    // Aplica nuestra función hash personalizada y luego el módulo del vector
+    /**
+     * @brief Calcula el índice en la tabla para una clave dada.
+     * * Aplica la función hash especializada según el tipo K y ajusta el 
+     * resultado al tamaño actual de la tabla usando el operador módulo.
+     * * @param key Clave a evaluar.
+     * @return int Índice calculado dentro de los límites de la tabla.
+     */
     int hashFunction(const K& key) const {
         CustomHash<K> hasher;
         return hasher(key) % size; 
     }
 
 public:
+    /**
+     * @brief Constructor de la Tabla Hash.
+     * @param tableSize Tamaño inicial del array (cantidad de buckets).
+     */
     HashTable(int tableSize) : size(tableSize) {
         table.resize(size);
     }
 
+    /**
+     * @brief Inserta una nueva clave o incrementa su contador si ya existe.
+     * * Calcula el índice de la clave. Si la clave ya se encuentra en la lista 
+     * enlazada de ese índice, incrementa su contador. Si no existe, la añade 
+     * al final de la lista con un contador inicial de 1.
+     * * @param key Clave a insertar o actualizar.
+     */
     void processTweet(const K& key) {
         int index = hashFunction(key);
 
@@ -89,6 +142,12 @@ public:
         table[index].emplace_back(key, 1);
     }
 
+    /**
+     * @brief Obtiene la cantidad de ocurrencias registradas para una clave.
+     * * Busca la clave en la lista enlazada correspondiente a su índice hash.
+     * * @param key Clave a buscar.
+     * @return int Número de ocurrencias de la clave (0 si no existe).
+     */
     int getTweetCount(const K& key) const {
         int index = hashFunction(key);
 
@@ -100,6 +159,12 @@ public:
         return 0;
     }
 
+    /**
+     * @brief Elimina una clave y su registro completo de la tabla.
+     * * Busca la clave en su respectiva lista enlazada. Si la encuentra, 
+     * elimina el nodo completo de la lista.
+     * * @param key Clave a eliminar.
+     */
     void remove(const K& key) {
         int index = hashFunction(key);
 

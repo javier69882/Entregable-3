@@ -1,3 +1,9 @@
+/**
+ * @file experimentos.cpp
+ * @brief Batería de pruebas experimentales para evaluar rendimiento y memoria de 
+ * diversas implementaciones de tablas Hash.
+ */
+
 #ifndef _WIN32
 #include <malloc.h>
 #endif
@@ -8,7 +14,7 @@
 #include <chrono>
 #include <unordered_map>
 
-//estructuras
+// Estructuras
 #include "parserdataset.hpp"
 #include "hash_abierto.hpp"
 #include "hash_cerrado.hpp"
@@ -16,11 +22,15 @@
 using namespace std;
 
 
-//FUNCIÓN MULTIPLATAFORMA PARA MEDIR MEMORIA (WSL / WINDOWS)
+// Función encargada de pedir memoria (Wsl / Windows)
 
 #ifdef _WIN32
 #include <windows.h>
 #include <psapi.h>
+/**
+ * @brief Obtiene la cantidad de memoria RAM (Working Set) utilizada por el proceso actual en Windows.
+ * * @return size_t Memoria en uso en bytes. Retorna 0 si falla.
+ */
 
 static size_t getCurrentProcessMemoryBytes() {
     PROCESS_MEMORY_COUNTERS_EX counters{};
@@ -31,6 +41,11 @@ static size_t getCurrentProcessMemoryBytes() {
 }
 #else
 #include <unistd.h>
+/**
+ * @brief Obtiene la cantidad de memoria RAM residente (RSS) utilizada por el proceso actual en sistemas UNIX/Linux.
+ * * Lee la información directamente desde /proc/self/statm.
+ * * @return size_t Memoria residente en uso en bytes.
+ */
 
 static size_t getCurrentProcessMemoryBytes() {
     size_t memorySize = 0;
@@ -45,20 +60,46 @@ static size_t getCurrentProcessMemoryBytes() {
 #endif
 
 
-//UTILIDADES PARA EXTRAER LA CLAVE CORRECTA SEGÚN EL TEMPLATE, PERMITIENDO USAR EL MISMO CÓDIGO PARA AMBOS TIPOS DE CLAVE
+// Utilidades para extraer la clave según el template 
 
+/**
+ * @brief Función template genérica para extraer la clave de un TweetData.
+ * * Permite que el código de los experimentos sea agnóstico al tipo de dato
+ * que se está utilizando como clave (ID numérico o nombre de usuario).
+ * * @tparam K Tipo de dato de la clave.
+ * @param tweet Objeto del cual extraer la clave.
+ * @return K La clave extraída.
+ */
 template <typename K> K extraerClave(const TweetData& tweet);
 
+/**
+ * @brief Especialización de extraerClave para enteros de 64 bits.
+ * @return long long El identificador único del usuario (user_id).
+ */
 template <> long long extraerClave<long long>(const TweetData& tweet) {
     return tweet.user_id;
 }
 
+/**
+ * @brief Especialización de extraerClave para cadenas de texto.
+ * @return string El nombre de usuario (user_screen_name).
+ */
 template <> string extraerClave<string>(const TweetData& tweet) {
     return tweet.user_screen_name;
 }
 
-// EXPERIMENTO DE RENDIMIENTO (TIEMPOS DE EJECUCIÓN CADA 10K)
-
+// Experimento de rendimiento (Tiempos de ejecución cada 10,000 inserciones).
+/**
+ * @brief Ejecuta pruebas de rendimiento midiendo el tiempo de inserción en diferentes tablas Hash.
+ * * Inserta elementos del dataset en cinco implementaciones distintas de tablas Hash:
+ * Abierto, Cerrado Lineal, Cerrado Cuadrático, Cerrado Doble y STL unordered_map.
+ * Registra el tiempo acumulado de inserción cada 10,000 elementos para analizar 
+ * cómo se degrada o mantiene el rendimiento a medida que aumenta el factor de carga.
+ * * @tparam K Tipo de dato de la clave (long long o std::string).
+ * @param dataset Vector que contiene los datos a procesar.
+ * @param archivo_salida Nombre del archivo CSV donde se guardarán los resultados.
+ * @param nombre_dataset Identificador del dataset para los registros del CSV.
+ */
 template <typename K>
 void experimentoTiempos(const vector<TweetData>& dataset, const string& archivo_salida, const string& nombre_dataset) {
     ofstream archivo(archivo_salida);
@@ -75,7 +116,7 @@ void experimentoTiempos(const vector<TweetData>& dataset, const string& archivo_
     for (int exp = 1; exp <= repeticiones; exp++) {
         cout << "  Ejecutando repeticion " << exp << "..." << endl;
 
-        //Hash Abierto 
+        // Hash Abierto 
         {
             HashTableAbierto<K> hashAbierto(table_size);
             long long tiempo_acumulado = 0;
@@ -111,7 +152,7 @@ void experimentoTiempos(const vector<TweetData>& dataset, const string& archivo_
             }
         }
 
-        //Hash Cerrado - Quadratic Probing 
+        // Hash Cerrado - Quadratic Probing 
         {
             HashTableCerrado<K> hashCuadratico(table_size, QUADRATIC);
             long long tiempo_acumulado = 0;
@@ -129,7 +170,7 @@ void experimentoTiempos(const vector<TweetData>& dataset, const string& archivo_
             }
         }
 
-        //Hash Cerrado - Double Hashing 
+        // Hash Cerrado - Double Hashing 
         {
             HashTableCerrado<K> hashDoble(table_size, DOUBLE);
             long long tiempo_acumulado = 0;
@@ -147,7 +188,7 @@ void experimentoTiempos(const vector<TweetData>& dataset, const string& archivo_
             }
         }
 
-        //Implementación STL (std::unordered_map) 
+        // Implementación STL (std::unordered_map) 
         {
             unordered_map<K, int> stlMap;
             stlMap.reserve(table_size); 
@@ -170,18 +211,29 @@ void experimentoTiempos(const vector<TweetData>& dataset, const string& archivo_
     cout << "Experimento de tiempos finalizado.\n" << endl;
 }
 
-//EXPERIMENTO DE MEMORIA RAM
+// Experimento de memoria (Consumo de RAM).
+
+/**
+ * @brief Mide el impacto en memoria RAM de aislar y poblar una estructura de datos específica.
+ * * Evalúa la memoria base del proceso, crea la estructura solicitada, inserta todos los 
+ * datos y calcula la diferencia de consumo (peak memory) en Megabytes.
+ * * @tparam K Tipo de dato de la clave.
+ * @param dataset Vector de datos a procesar.
+ * @param archivo Flujo de salida al archivo CSV abierto.
+ * @param nombre_estructura Nombre de la estructura a instanciar y medir.
+ * @param tipo_clave Descripción del tipo de clave evaluado (ej. "user_id").
+ */
 
 template <typename K>
 void medirMemoriaEstructura(const vector<TweetData>& dataset, ofstream& archivo, const string& nombre_estructura, const string& tipo_clave) {
     int table_size = 300000;
     
-    //Obligar a Linux a devolver la memoria residual al SO antes de medir
+    // Obligar a Linux a devolver la memoria residual al SO antes de medir
 #ifndef _WIN32
     malloc_trim(0); 
 #endif
 
-    //Medir RAM base ANTES de crear la estructura
+    // Medir RAM base ANTES de crear la estructura
     size_t mem_antes = getCurrentProcessMemoryBytes();
 
     //Crear y llenar la estructura
@@ -224,6 +276,14 @@ void medirMemoriaEstructura(const vector<TweetData>& dataset, ofstream& archivo,
         }
     } 
 }
+
+/**
+ * @brief Orquesta el experimento de medición de memoria para todas las estructuras Hash.
+ * * @tparam K Tipo de dato de la clave.
+ * @param dataset Datos a cargar en las estructuras.
+ * @param archivo_salida Archivo CSV donde se añadirán los resultados (en modo append).
+ * @param tipo_clave String descriptivo de la clave que se está insertando.
+ */
 template <typename K>
 void experimentoMemoria(const vector<TweetData>& dataset, const string& archivo_salida, const string& tipo_clave) {
     // Abrimos en modo append (ios::app) por si usamos el mismo archivo para varias llamadas
@@ -245,18 +305,23 @@ void experimentoMemoria(const vector<TweetData>& dataset, const string& archivo_
     cout << "Medicion de memoria finalizada.\n" << endl;
 }
 
-
-
-
+/**
+ * @brief Punto de entrada principal. Coordina la carga de datos y la ejecución de todos los experimentos.
+ * * El flujo principal es:
+ * 1. Cargar el dataset en memoria principal.
+ * 2. Ejecutar experimentos de consumo de RAM.
+ * 3. Ejecutar pruebas de estrés/tiempo (20 repeticiones cada una).
+ * * @return int 0 si todo sale bien, 1 si falla la lectura del dataset.
+ */
 int main() {
     cout << "========================================\n";
     cout << "   INICIANDO EXPERIMENTOS\n";
     cout << "========================================\n\n";
 
-    //Cargar el dataset
+    // Cargar el dataset
     cout << "[1/3] Cargando dataset 'auspol2019.csv'..." << endl;
     
-    // Ajustado según la estructura de carpetas de tu proyecto
+    // Se asume que el archivo CSV está en la carpeta "dataset" relativa al ejecutable
     vector<TweetData> tweets = cargarDataset("dataset/auspol2019.csv"); 
 
     if (tweets.empty()) {
@@ -265,11 +330,11 @@ int main() {
     }
     cout << "Dataset cargado correctamente. Total de tweets: " << tweets.size() << "\n\n";
 
-    //Iniciar Experimento de Memoria
+    // Iniciar Experimento de Memoria
     cout << "[2/3] Ejecutando experimentos de Memoria..." << endl;
     string archivo_memoria = "memoria_consumida.csv";
     
-    // Abrimos el archivo de memoria primero para escribirle la cabecera o limpiarla
+    // Abrimos archivo de memoria primero para escribir encabezados
     ofstream out_memoria(archivo_memoria);
     if (out_memoria.is_open()) {
         out_memoria << "estructura_de_datos;tipo_clave;memoria_usada_mb\n";
@@ -278,23 +343,23 @@ int main() {
         cerr << "Error al crear " << archivo_memoria << endl;
     }
 
-    //Ejecutamos la memoria para ambas claves
+    // Ejecutamos la memoria para ambas claves
     experimentoMemoria<long long>(tweets, archivo_memoria, "user_id");
     experimentoMemoria<string>(tweets, archivo_memoria, "user_screen_name");
 
-    //Iniciar Experimentos de Tiempo
+    // Se inician Experimentos de Tiempo
     cout << "[3/3] Ejecutando experimentos de Tiempo (20 repeticiones por estructura)..." << endl;
 
 
-    //Ejecutamos los tiempos para la clave user_id
+    // Ejecutamos los tiempos para la clave user_id
     cout << ">>> Iniciando pruebas de rendimiento para claves numericas (user_id) <<<" << endl;
     experimentoTiempos<long long>(tweets, "tiempos_user_id.csv", "auspol2019");
 
-    //Ejecutamos los tiempos para la clave user_screen_name
+    // Ejecutamos los tiempos para la clave user_screen_name
     cout << ">>> Iniciando pruebas de rendimiento para claves de texto (user_screen_name) <<<" << endl;
     experimentoTiempos<string>(tweets, "tiempos_user_name.csv", "auspol2019");
 
-    //Listo ╰(*°▽°*)╯
+    // Se finaliza el programa con un mensaje de éxito
     cout << "========================================\n";
     cout << "   EXPERIMENTOS COMPLETADOS CON EXITO\n";
     cout << "========================================\n";

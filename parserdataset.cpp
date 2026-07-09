@@ -1,7 +1,27 @@
+/**
+ * @file parserdataset.cpp
+ * @brief Implementación del parser para extraer el dataset de tweets desde un archivo CSV.
+ * * Contiene la lógica para procesar archivos CSV de manera segura, manejando
+ * correctamente los delimitadores y los campos encerrados entre comillas.
+ */
+
 #include "parserdataset.hpp"
 #include <fstream>
 #include <iostream>
 
+/**
+ * @brief Lee y procesa un archivo CSV para extraer identificadores y nombres de usuario.
+ * * Implementa un analizador (parser) que lee el archivo carácter por carácter.
+ * Esta aproximación permite distinguir entre las comas (',') que actúan como 
+ * separadores de columnas y las comas que forman parte del contenido de texto, 
+ * controlando un estado booleano cuando se encuentran comillas dobles ('"').
+ * * Se extraen específicamente la columna 5 (user_id) y la columna 7 (user_screen_name).
+ * Si una fila está corrupta o le faltan columnas, se ignora silenciosamente para 
+ * no detener la carga masiva.
+ * * @param rutaArchivo Ruta relativa o absoluta al archivo CSV a cargar.
+ * @return std::vector<TweetData> Vector que contiene las estructuras de datos parseadas.
+ * Retorna un vector vacío si el archivo no se pudo abrir.
+ */
 std::vector<TweetData> cargarDataset(const std::string& rutaArchivo) {
     std::vector<TweetData> dataset;
     std::ifstream archivo(rutaArchivo);
@@ -15,15 +35,15 @@ std::vector<TweetData> cargarDataset(const std::string& rutaArchivo) {
     std::vector<std::string> fila_actual;
     bool entre_comillas = false;
     char c;
-    bool primera_fila = true; // Para ignorar los encabezados
+    bool primera_fila = true; // Flag para ignorar la fila de encabezados
 
     // Leemos el archivo caracter por caracter
     while (archivo.get(c)) {
         if (c == '"') {
-            entre_comillas = !entre_comillas; // Cambiamos el estado
+            entre_comillas = !entre_comillas; // Cambiamos el estado de lectura
         } 
         else if (c == ',' && !entre_comillas) {
-            // Fin de una columna
+            // Fin de una columna legítima
             fila_actual.push_back(campo_actual);
             campo_actual.clear();
         } 
@@ -53,7 +73,7 @@ std::vector<TweetData> cargarDataset(const std::string& rutaArchivo) {
             fila_actual.clear();
         } 
         else {
-            // Es parte del texto de la columna actual
+            // Es parte del texto de la columna actual, lo agregamos al buffer
             campo_actual += c;
         }
     }
